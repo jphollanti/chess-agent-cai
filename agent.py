@@ -74,7 +74,8 @@ def analyze_recently_lost_games(input: str) -> str:
         lean_games = [
             {
                 "pgn": extract_pgn_moves(g["pgn"]),
-                "eval_dips": g.get("eval_dips", {}),
+                "white_dips": g.get("white_dips"),
+                "black_dips": g.get("black_dips"),
                 "termination": g.get("termination", ""),
             }
             for g in all_games
