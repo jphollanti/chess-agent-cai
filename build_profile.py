@@ -20,7 +20,7 @@ from config import (
 
 from analyse import (
     analyze_pgn,
-    load_pgns_from_file,
+    load_from_file,
     init_stockfish,
     save_analysis,
     get_opening_from_eco,
@@ -108,7 +108,7 @@ def build_player_profile(analyzed_games):
     with open(PROFILE_FILE, "w") as f:
         json.dump(profile, f, indent=2)
 
-    logging.info(f"Saved player profile to {PROFILE_FILE}")
+    print(f"Saved player profile to {PROFILE_FILE}")
 
 def parse_time_control(tc):
     # Returns (base, increment)
@@ -193,14 +193,15 @@ def analyze_style(analyzed_games):
 
 
 def build_player_profile_from_file():
-    logging.info("Building full player profile...")
+    print()
+    print("Building full player profile...")
     
-    pgns = load_pgns_from_file(GAMES_ARCHIVE_FILE)
+    games = load_from_file(GAMES_ARCHIVE_FILE)
 
     if str(GAMES_ANALYSE_MAX).lower() != 'all':
         try:
             max_games = int(GAMES_ANALYSE_MAX)
-            pgns = pgns[:max_games]
+            games = games[:max_games]
             logging.warning(f"[DEBUG] Limiting analysis to {max_games} games.")
         except ValueError:
             logging.error(f"[ERROR] GAMES_ANALYSE_MAX is not a valid number: {GAMES_ANALYSE_MAX}")
@@ -208,7 +209,7 @@ def build_player_profile_from_file():
     my_stockfish = init_stockfish()
 
     analyzed = []
-    for i, game in enumerate(pgns):
+    for i, game in enumerate(games):
         try:
             # The PGN might be inside a dict (chess.com full game JSON)
             if isinstance(game, dict) and "pgn" in game:
@@ -218,8 +219,11 @@ def build_player_profile_from_file():
             else:
                 raise ValueError("Unknown game format")
 
-            logging.info(f"Analyzing profile game {i + 1}/{len(pgns)}...")
-            analyzed.append(analyze_pgn(pgn, my_stockfish))
+            print(f"Analyzing profile game {i + 1}/{len(games)}...")
+            ag = analyze_pgn(pgn, my_stockfish)
+            # append end_time for sorting the games later on
+            ag["end_time"] = game["end_time"]
+            analyzed.append(ag)
         except Exception as e:
             logging.error(f"Error analyzing profile game {i + 1}: {e}")
 

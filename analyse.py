@@ -135,7 +135,7 @@ def analyze_pgn(pgn, stockfish):
     }
 
 
-def load_pgns_from_file(path):
+def load_from_file(path):
     with open(path, "r") as f:
         return json.load(f)
 
@@ -143,17 +143,17 @@ def load_pgns_from_file(path):
 def save_analysis(data, path):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
-    logging.info(f"Saved analysis to {path}")
+    print(f"\nSaved analysis to {path}")
 
 def main():
-    logging.info("Loading PGNs...")
-    pgns = load_pgns_from_file(GAMES_ARCHIVE_FILE)
+    print("\nLoading PGNs...")
+    pgns = load_from_file(GAMES_ARCHIVE_FILE)
     my_stockfish = init_stockfish()
 
     output = []
     for i, pgn in enumerate(pgns):
         try:
-            logging.info(f"Analyzing game {i + 1}/{len(pgns)}...")
+            print(f"\nAnalyzing game {i + 1}/{len(pgns)}...")
             output.append(analyze_pgn(pgn, my_stockfish))
         except Exception as e:
             logging.error(f"Error analyzing game {i + 1}: {e}")

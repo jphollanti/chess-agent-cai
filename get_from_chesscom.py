@@ -4,6 +4,7 @@ import logging
 import requests
 from datetime import datetime, timedelta
 import calendar
+from dateutil import parser
 
 from config import (
     GAMES_ARCHIVE_FILE,
@@ -54,32 +55,23 @@ def fetch_games_from_url(url):
     return response.json().get("games", [])
 
 def fetch_recent_games(months_back=GAMES_ARCHIVE_GET_MONTHS):
-    """Fetch and store games from the past `months_back` months and save to file."""
     if not CHESSCOM_USERNAME:
         raise ValueError("CHESSCOM_USERNAME is not set in config or .env")
 
     archives = fetch_archives()
     archives.sort(reverse=True)
 
-    # Determine cut-off date
     cutoff_date = datetime.now() - timedelta(days=30 * months_back)
-
     all_recent_games = []
     username_lower = CHESSCOM_USERNAME.lower()
 
     for archive_url in archives:
-        # Parse YYYY/MM from the archive URL
         try:
-            _, year, month = archive_url.rsplit("/", 2)
-            archive_date = datetime(int(year), int(month), calendar.monthrange(int(year), int(month))[1])
+            games = fetch_games_from_url(archive_url)
         except Exception as e:
-            logging.warning(f"Could not parse date from {archive_url}: {e}")
+            logging.warning(f"Failed to fetch from {archive_url}: {e}")
             continue
 
-        if archive_date < cutoff_date:
-            break  # Skip older archives
-
-        games = fetch_games_from_url(archive_url)
         for game in games:
             pgn = game.get("pgn")
             if not pgn:
@@ -87,19 +79,22 @@ def fetch_recent_games(months_back=GAMES_ARCHIVE_GET_MONTHS):
 
             white = game.get("white", {}).get("username", "").lower()
             black = game.get("black", {}).get("username", "").lower()
-
             if white != username_lower and black != username_lower:
-                continue  # Skip games that don't involve the user
+                continue
+
+            end_time = game.get("end_time")
+            if end_time:
+                game_datetime = datetime.fromtimestamp(end_time)
+                if game_datetime < cutoff_date:
+                    continue  # Skip older games
 
             all_recent_games.append(game)
 
-    # Save raw games to file
     os.makedirs(os.path.dirname(GAMES_ARCHIVE_FILE), exist_ok=True)
-
     with open(GAMES_ARCHIVE_FILE, "w") as f:
         json.dump(all_recent_games, f, indent=2)
 
-    logging.info(f"Saved {len(all_recent_games)} games to {GAMES_ARCHIVE_FILE}")
+    print(f"\nSaved {len(all_recent_games)} games to {GAMES_ARCHIVE_FILE}")
     return all_recent_games
 
 
@@ -107,7 +102,7 @@ def main():
     if not CHESSCOM_USERNAME:
         raise ValueError("CHESSCOM_USERNAME is not set in config or .env")
 
-    logging.info(f"Fetching last {GAMES_TO_ANALYSE} lost games for {CHESSCOM_USERNAME}")
+    print(f"\nFetching last {GAMES_TO_ANALYSE} lost games for {CHESSCOM_USERNAME}")
     lost_pgns = extract_lost_games(GAMES_TO_ANALYSE)
 
     os.makedirs(os.path.dirname(GAMES_ARCHIVE_FILE), exist_ok=True)
@@ -115,10 +110,10 @@ def main():
     with open(GAMES_ARCHIVE_FILE, "w") as f:
         json.dump(lost_pgns, f, indent=2)
 
-    logging.info(f"Saved {len(lost_pgns)} lost games to {GAMES_ARCHIVE_FILE}")
+    print(f"\nSaved {len(lost_pgns)} lost games to {GAMES_ARCHIVE_FILE}")
 
 
 if __name__ == "__main__":
     #main()
-    logging.info("Fetching games for profile building...")
+    print("\nFetching games for profile building...")
     fetch_recent_games(months_back=3)

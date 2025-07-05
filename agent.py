@@ -97,7 +97,8 @@ def analyze_recently_lost_games(input: str) -> str:
                 "pgn": extract_pgn_moves(g["pgn"]),
                 "white_dips": g.get("white_dips"),
                 "black_dips": g.get("black_dips"),
-                "termination": g.get("termination", ""),
+                "termination": g.get("termination"),
+                "end_time": g.get("end_time"),
             }
             for g in all_games
         ]
@@ -106,6 +107,7 @@ def analyze_recently_lost_games(input: str) -> str:
             g for g in lean_games
             if not (f"{CHESSCOM_USERNAME} won" in g.get("termination"))
         ]
+        lost_games.sort(key=lambda g: g.get("end_time"), reverse=True)
         # prompt length becomes an issue with local llm
         recent_losses = lost_games[:5]
 
@@ -142,16 +144,16 @@ Here is the JSON data:
 
 def ensure_profile_data():
     if not os.path.exists(GAMES_ARCHIVE_FILE):
-        print("Games archive not found, fetching...")
+        print("\nGames archive not found, fetching...")
         fetch_recent_games()
     else:
         print("Games archive already available.")
 
     if not os.path.exists(PROFILE_FILE):
-        print("Profile not yet analyzed — analyzing now. This may take a while depending on the amount of games available...")
+        print("\nProfile not yet analyzed — analyzing now. This may take a while depending on the amount of games available...")
         build_player_profile_from_file()
     else:
-        print("Profile already analyzed.")
+        print("\nProfile already analyzed.")
 
 @tool
 def query_chess_profile(query: str) -> str:
