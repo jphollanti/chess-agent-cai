@@ -15,7 +15,7 @@ It builds a personalized player profile with insights like:
 
 ### 1. Create environment
 
-Assuming you're using Conda and UV.
+Assuming you're using Conda and uv.
 
 ```bash
 conda create --name cai python=3.11
@@ -32,8 +32,6 @@ OPENAI_API_KEY=your_openai_api_key
 CHESSCOM_USERNAME=your_chesscom_username
 PROFILE_INFO=I'm typically rated around 1500 in rapid games. I favor classical openings like the Queen's Gambit and often opt for fianchetto setups, especially with black on the kingside. I'm a sucker for diving head first into a tactic like sacrificing a knight or a bishop for two pawns in front of the opponent's king.
 ```
-
-Run setup-dependencies.sh to download stockfish, ECO openings and openings book 
 
 ### 3. Other than python dependencies
 
