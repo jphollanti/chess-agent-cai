@@ -22,10 +22,10 @@ from config import (
     OPENAI_MODEL,
     OPENAI_API_KEY,
     PROFILE_FILE,
-    PROFILE_ANALYSED_GAMES_FILE,
-    PROFILE_RAW_GAMES_FILE,
+    ANALYSED_GAMES_FILE,
+    GAMES_ARCHIVE_FILE,
 )
-from get_games import get_games_for_profile_analysis
+from get_from_chesscom import fetch_recent_games
 from build_profile import build_player_profile_from_file
 
 # Optional: ensure logging
@@ -35,13 +35,13 @@ class DummyInput(BaseModel):
     input: str
 
 def ensure_profile_data():
-    if not os.path.exists(PROFILE_RAW_GAMES_FILE):
-        print("Profile raw games not found, fetching...")
-        get_games_for_profile_analysis()
+    if not os.path.exists(GAMES_ARCHIVE_FILE):
+        print("Games archive not found, fetching...")
+        fetch_recent_games()
     else:
-        print("Profile raw games already available.")
+        print("Games archive already available.")
 
-    if not os.path.exists(PROFILE_ANALYSED_GAMES_FILE):
+    if not os.path.exists(PROFILE_FILE):
         print("Profile not yet analyzed — analyzing now. This may take a while depending on the amount of games available...")
         build_player_profile_from_file()
     else:
@@ -100,7 +100,7 @@ def update_player_profile(input: str) -> str:
 def rebuild_player_profile(input: str) -> str:
     """Force rebuild the player profile, regardless of whether it exists."""
     try:
-        get_games_for_profile_analysis()
+        fetch_recent_games()
         build_player_profile_from_file()
         return "Player profile has been rebuilt successfully."
     except Exception as e:

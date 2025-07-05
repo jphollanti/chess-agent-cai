@@ -17,16 +17,14 @@ ECO_OPENINGS_PATH = ROOT_DIR / "eco_openings/"
 
 GAMES_TO_ANALYSE = 10
 
-RAW_GAMES_FILE = DATA_DIR / "raw_games.json"
-ANALYSED_GAMES_FILE = DATA_DIR / "analysed_games.json"
+GAMES_ARCHIVE_FILE = DATA_DIR / "games_archive.json"
+GAMES_ARCHIVE_GET_MONTHS = 3
+ANALYSED_GAMES_FILE = DATA_DIR / "games_analyzed.json"
 COACH_REPORT_FILE = DATA_DIR / "coach_report.txt"
 
 # Profile
-PROFILE_RAW_GAMES_FILE = DATA_DIR / "raw_games_profile.json"
-PROFILE_ANALYSED_GAMES_FILE = DATA_DIR / "profile_analysed_games.json"
-PROFILE_AMOUNT_OF_MONTHS = 3
 PROFILE_ANALYSE_MAX_GAMES = 7
-PROFILE_FILE = DATA_DIR / "player_profile.json"
+PROFILE_FILE = DATA_DIR / "profile.json"
 
 LLM_PROVIDER = "local"
 LLM_TEMPERATURE = 0.2

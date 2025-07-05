@@ -10,14 +10,12 @@ import requests
 
 from stockfish import Stockfish
 from config import (
-    PROFILE_RAW_GAMES_FILE,
-    PROFILE_ANALYSED_GAMES_FILE,
+    GAMES_ARCHIVE_FILE,
     PROFILE_FILE,
     PROFILE_INFO,
     CHESSCOM_USERNAME,
-    BOOK_PATH,
-    ECO_OPENINGS_PATH,
     PROFILE_ANALYSE_MAX_GAMES,
+    ANALYSED_GAMES_FILE,
 )
 
 from analyse import (
@@ -25,80 +23,15 @@ from analyse import (
     load_pgns_from_file,
     init_stockfish,
     save_analysis,
+    get_opening_from_eco,
 )
+
+from get_from_chesscom import fetch_stats
 
 HEADERS = {
     "User-Agent": "chess-analyzer-script/1.0 (+https://github.com/your-github)"
 }
 
-eco_db = {}
-
-def get_chesscom_stats():
-    url = f"https://api.chess.com/pub/player/{CHESSCOM_USERNAME}/stats"
-    response = requests.get(url, headers=HEADERS)
-
-    if response.status_code != 200:
-        logging.warning(f"Failed to fetch Chess.com stats for {CHESSCOM_USERNAME} return code {response.status_code}")
-        raise RuntimeError(f"Failed to fetch Chess.com stats for {CHESSCOM_USERNAME}")
-
-    data = response.json()
-
-    fields = [
-        "fide", "lessons", "chess_daily", "chess_rapid",
-        "chess_blitz", "chess_bullet", "chess960_daily"
-    ]
-
-    stats = {}
-    for field in fields:
-        stats[field] = data.get(field, None)
-
-    return stats
-
-def get_opening_from_eco(pgn_str):
-    try:
-        game = chess.pgn.read_game(io.StringIO(pgn_str))
-        board = game.board()
-        opening = None
-
-        for move in game.mainline_moves():
-            board.push(move)
-            fen_key = board.fen()  # now using all 6 fields
-            if fen_key in eco_db:
-                rec = eco_db[fen_key]
-                opening = f"{rec['eco']} - {rec['name']}"
-
-        return opening or "Unknown"
-    except Exception as e:
-        return f"Error: {e}"
-
-
-
-def get_opening_from_polyglot_moves(pgn_str):
-    try:
-        game = chess.pgn.read_game(io.StringIO(pgn_str))
-        board = game.board()
-        moves_san = []
-
-        with chess.polyglot.open_reader(BOOK_PATH) as reader:
-            for move in game.mainline_moves():
-                board.push(move)
-                san = board.san(move)
-                moves_san.append(san)
-
-                try:
-                    reader.find(board)
-                except IndexError:
-                    break  # out of book
-
-        # Match longest prefix in opening_map
-        for length in range(len(moves_san), 0, -1):
-            key = " ".join(moves_san[:length])
-            if key in opening_map:
-                data = opening_map[key]
-                return f"{data['eco']} - {data['name']}"
-        return "Unknown"
-    except Exception:
-        return "Unknown"
 
 def select_representative_games(analyzed_games, max_per_category=5):
     categorized = {"win": [], "loss": [], "draw": []}
@@ -163,7 +96,7 @@ def build_player_profile(analyzed_games):
         "samples": select_representative_games(analyzed_games),
         "total_games": len(analyzed_games),
         "style": style,
-        "chess_com_stats": get_chesscom_stats(),
+        "chess_com_stats": fetch_stats(),
         "profile_in_own_words": PROFILE_INFO
     }
 
@@ -198,7 +131,7 @@ def is_time_trouble(game):
     # Look for *2 or more* major blunders after game has progressed far enough
     big_late_blunders = [
         d for d in my_dips
-        if isinstance(d["delta"], int) and abs(d["delta"]) > 150 and d["move_number"] >= 50
+        if isinstance(d["delta"], int) and abs(d["delta"]) > 150 and d["move_number"] >= 60
     ]
 
     return len(big_late_blunders) >= 2
@@ -257,17 +190,8 @@ def analyze_style(analyzed_games):
 
 def build_player_profile_from_file():
     logging.info("Building full player profile...")
-
-    # Load ECO opening map based on FEN → name/ECO
-    global eco_db
-    for fname in [
-        "ecoA.json", "ecoB.json", "ecoC.json",
-        "ecoD.json", "ecoE.json", "eco_interpolated.json"
-    ]:
-        with open(f"{ECO_OPENINGS_PATH}/{fname}") as f:
-            eco_db.update(json.load(f))
     
-    pgns = load_pgns_from_file(PROFILE_RAW_GAMES_FILE)
+    pgns = load_pgns_from_file(GAMES_ARCHIVE_FILE)
 
     if str(PROFILE_ANALYSE_MAX_GAMES).lower() != 'all':
         try:
@@ -295,7 +219,7 @@ def build_player_profile_from_file():
         except Exception as e:
             logging.error(f"Error analyzing profile game {i + 1}: {e}")
 
-    save_analysis(analyzed, PROFILE_ANALYSED_GAMES_FILE)
+    save_analysis(analyzed, ANALYSED_GAMES_FILE)
     build_player_profile(analyzed)
 
 

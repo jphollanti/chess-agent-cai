@@ -9,10 +9,14 @@ from config import (
     STOCKFISH_PATH,
     EVAL_DROP_THRESHOLD,
     ANALYSED_GAMES_FILE,
-    RAW_GAMES_FILE,
+    GAMES_ARCHIVE_FILE,
+    ECO_OPENINGS_PATH,
 )
 
 logging.basicConfig(level=logging.INFO)
+
+eco_db = {}
+
 
 def init_stockfish():
     return Stockfish(
@@ -23,6 +27,36 @@ def init_stockfish():
         },
     )
 
+def init_eco_db():
+    # Load ECO opening map based on FEN → name/ECO
+    global eco_db
+    for fname in [
+        "ecoA.json", "ecoB.json", "ecoC.json",
+        "ecoD.json", "ecoE.json", "eco_interpolated.json"
+    ]:
+        with open(f"{ECO_OPENINGS_PATH}/{fname}") as f:
+            eco_db.update(json.load(f))
+
+def get_opening_from_eco(pgn_str):
+    try:
+        global eco_db
+        if len(eco_db) == 0:
+            init_eco_db()
+
+        game = chess.pgn.read_game(io.StringIO(pgn_str))
+        board = game.board()
+        opening = None
+
+        for move in game.mainline_moves():
+            board.push(move)
+            fen_key = board.fen()  # now using all 6 fields
+            if fen_key in eco_db:
+                rec = eco_db[fen_key]
+                opening = f"{rec['eco']} - {rec['name']}"
+
+        return opening or "Unknown"
+    except Exception as e:
+        return f"Error: {e}"
 
 def evaluate_game(pgn, stockfish):
     """Evaluate each move of a game using Stockfish and track evaluations."""
@@ -113,7 +147,7 @@ def save_analysis(data, path):
 
 def main():
     logging.info("Loading PGNs...")
-    pgns = load_pgns_from_file(RAW_GAMES_FILE)
+    pgns = load_pgns_from_file(GAMES_ARCHIVE_FILE)
     my_stockfish = init_stockfish()
 
     output = []

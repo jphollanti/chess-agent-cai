@@ -6,11 +6,10 @@ from datetime import datetime, timedelta
 import calendar
 
 from config import (
-    RAW_GAMES_FILE,
+    GAMES_ARCHIVE_FILE,
     CHESSCOM_USERNAME,
     GAMES_TO_ANALYSE,
-    PROFILE_RAW_GAMES_FILE,
-    PROFILE_AMOUNT_OF_MONTHS,
+    GAMES_ARCHIVE_GET_MONTHS,
 )
 
 HEADERS = {
@@ -20,6 +19,27 @@ HEADERS = {
 logging.basicConfig(level=logging.INFO)
 
 
+def fetch_stats():
+    url = f"https://api.chess.com/pub/player/{CHESSCOM_USERNAME}/stats"
+    response = requests.get(url, headers=HEADERS)
+
+    if response.status_code != 200:
+        logging.warning(f"Failed to fetch Chess.com stats for {CHESSCOM_USERNAME} return code {response.status_code}")
+        raise RuntimeError(f"Failed to fetch Chess.com stats for {CHESSCOM_USERNAME}")
+
+    data = response.json()
+
+    fields = [
+        "fide", "lessons", "chess_daily", "chess_rapid",
+        "chess_blitz", "chess_bullet", "chess960_daily"
+    ]
+
+    stats = {}
+    for field in fields:
+        stats[field] = data.get(field, None)
+
+    return stats
+
 def fetch_archives():
     """Fetch archive URLs for all past months for a given user."""
     url = f"https://api.chess.com/pub/player/{CHESSCOM_USERNAME}/games/archives"
@@ -27,49 +47,14 @@ def fetch_archives():
     response.raise_for_status()
     return response.json()["archives"]
 
-
 def fetch_games_from_url(url):
     """Fetch games from a specific Chess.com archive URL."""
     response = requests.get(url, headers=HEADERS)
     response.raise_for_status()
     return response.json().get("games", [])
 
-
-def extract_lost_games(max_games=10):
-    """Extract PGNs of lost games from the most recent archives."""
-    archives = fetch_archives()[::-1]  # Start from newest
-    lost_games = []
-    username_lower = CHESSCOM_USERNAME.lower()
-
-    for archive_url in archives:
-        games = fetch_games_from_url(archive_url)
-
-        for game in sorted(games, key=lambda g: g.get("end_time", 0), reverse=True):
-            pgn = game.get("pgn")
-            if not pgn:
-                continue
-
-            white = game.get("white", {}).get("username", "").lower()
-            black = game.get("black", {}).get("username", "").lower()
-
-            if white == username_lower:
-                result = game.get("white", {}).get("result")
-            elif black == username_lower:
-                result = game.get("black", {}).get("result")
-            else:
-                continue  # Not this player's game
-
-            if result in {"resigned", "timeout", "checkmated", "lose"}:
-                lost_games.append(pgn)
-
-            if len(lost_games) >= max_games:
-                return lost_games
-
-    return lost_games
-
-
-def get_games_for_profile_analysis(months_back=PROFILE_AMOUNT_OF_MONTHS):
-    """Fetch and store games from the past `months_back` months into PROFILE_RAW_GAMES_FILE."""
+def fetch_recent_games(months_back=GAMES_ARCHIVE_GET_MONTHS):
+    """Fetch and store games from the past `months_back` months and save to file."""
     if not CHESSCOM_USERNAME:
         raise ValueError("CHESSCOM_USERNAME is not set in config or .env")
 
@@ -109,12 +94,12 @@ def get_games_for_profile_analysis(months_back=PROFILE_AMOUNT_OF_MONTHS):
             all_recent_games.append(game)
 
     # Save raw games to file
-    os.makedirs(os.path.dirname(PROFILE_RAW_GAMES_FILE), exist_ok=True)
+    os.makedirs(os.path.dirname(GAMES_ARCHIVE_FILE), exist_ok=True)
 
-    with open(PROFILE_RAW_GAMES_FILE, "w") as f:
+    with open(GAMES_ARCHIVE_FILE, "w") as f:
         json.dump(all_recent_games, f, indent=2)
 
-    logging.info(f"Saved {len(all_recent_games)} games to {PROFILE_RAW_GAMES_FILE}")
+    logging.info(f"Saved {len(all_recent_games)} games to {GAMES_ARCHIVE_FILE}")
     return all_recent_games
 
 
@@ -125,15 +110,15 @@ def main():
     logging.info(f"Fetching last {GAMES_TO_ANALYSE} lost games for {CHESSCOM_USERNAME}")
     lost_pgns = extract_lost_games(GAMES_TO_ANALYSE)
 
-    os.makedirs(os.path.dirname(RAW_GAMES_FILE), exist_ok=True)
+    os.makedirs(os.path.dirname(GAMES_ARCHIVE_FILE), exist_ok=True)
 
-    with open(RAW_GAMES_FILE, "w") as f:
+    with open(GAMES_ARCHIVE_FILE, "w") as f:
         json.dump(lost_pgns, f, indent=2)
 
-    logging.info(f"Saved {len(lost_pgns)} lost games to {RAW_GAMES_FILE}")
+    logging.info(f"Saved {len(lost_pgns)} lost games to {GAMES_ARCHIVE_FILE}")
 
 
 if __name__ == "__main__":
     #main()
     logging.info("Fetching games for profile building...")
-    get_games_for_profile_analysis(months_back=3)
+    fetch_recent_games(months_back=3)
