@@ -1,0 +1,10 @@
+trash
+.DS_Store
+engine
+*.json
+*.txt
+.env
+__pycache__/
+book
+eco_openings
+data
