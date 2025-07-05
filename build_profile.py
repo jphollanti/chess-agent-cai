@@ -33,8 +33,12 @@ HEADERS = {
 }
 
 
-def select_representative_games(analyzed_games, max_per_category=5):
-    categorized = {"win": [], "loss": [], "draw": []}
+def select_representative_games(analyzed_games, max_per_category=3):
+    categorized = {
+        "win": [], 
+        "loss": [], 
+        "draw": []
+    }
 
     def game_score(game):
         # More dips = worse; fewer = cleaner performance

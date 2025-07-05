@@ -62,12 +62,33 @@ def get_llm():
             temperature = LLM_TEMPERATURE,
         )
 
+def slim_down_profile(profile):
+    del profile["total_games"]
+    del profile["chess_com_stats"]["fide"]
+    del profile["chess_com_stats"]["lessons"]
+    del profile["chess_com_stats"]["chess_daily"]
+    profile["chess_com_stats"]["chess_rapid"] = {
+        "rating": profile["chess_com_stats"]["chess_rapid"]["last"]["rating"]
+    }
+    profile["chess_com_stats"]["chess_blitz"] = {
+        "rating": profile["chess_com_stats"]["chess_blitz"]["last"]["rating"]
+    }
+    del profile["chess_com_stats"]["chess_bullet"]
+    del profile["chess_com_stats"]["chess960_daily"]
+    return profile
+
 @tool(args_schema=DummyInput)
 def analyze_recently_lost_games(input: str) -> str:
     """Analyze the last n lost games and provide coaching feedback."""
 
-    ## Todo, add profile to prompt
     try:
+        with open(PROFILE_FILE, "r") as f:
+            profile = json.load(f)
+        
+        # try to keep the prompt size low
+        profile = slim_down_profile(profile)
+        del profile["samples"]
+
         with open(GAMES_ANALYSED_FILE, "r") as f:
             all_games = json.load(f)
         
@@ -100,6 +121,9 @@ Below is a JSON array. Each element represents a game I lost recently. Each cont
 
 My username is {CHESSCOM_USERNAME}
 
+Here's subset of my profile in chess.com: 
+{json.dumps(profile)}
+
 Please analyze the set of games as a whole and identify:
 1. **Recurring mistakes** or themes across multiple games (e.g., hanging pieces, poor openings, tactical oversights).
 2. **Phases of the game** where mistakes tend to occur (opening, middlegame, endgame).
@@ -107,13 +131,8 @@ Please analyze the set of games as a whole and identify:
 4. If possible, categorize the dips (e.g., strategic, tactical, time-pressure blunders).
 
 Here is the JSON data:
-{json.dumps(recent_losses, indent=2)}
+{json.dumps(recent_losses)}
 """
-        print('---')
-        print('---')
-        print(prompt)
-        print('---')
-        print('---')
         
         llm = get_llm()
         response = llm.predict(prompt)
@@ -146,11 +165,29 @@ def query_chess_profile(query: str) -> str:
 
     try:
         with open(PROFILE_FILE, "r") as f:
-            profile_data = json.load(f)
+            profile = json.load(f)
     except Exception as e:
         return f"Error loading profile: {e}"
+    
+    # try to slim down the profile to fit in a local llm
+    profile = slim_down_profile(profile)
 
-    context = json.dumps(profile_data, indent=2)
+    lean = []
+    for s in profile["samples"]["win"]:
+        lean.append(extract_pgn_moves(s))
+    profile["samples"]["win"] = lean
+
+    lean = []
+    for s in profile["samples"]["loss"]:
+        lean.append(extract_pgn_moves(s))
+    profile["samples"]["loss"] = lean
+    
+    lean = []
+    for s in profile["samples"]["draw"]:
+        lean.append(extract_pgn_moves(s))
+    profile["samples"]["draw"] = lean
+
+    context = json.dumps(profile)
 
     prompt = f"""
 You are a helpful chess coach assistant for a human player. 
@@ -163,7 +200,7 @@ PROFILE DATA:
 QUESTION:
 {query}
 """
-
+    
     llm = get_llm()
     return llm.predict(prompt)
 
@@ -231,6 +268,7 @@ def main():
     print("Ask a question (or type 'exit'):")
 
     while True:
+        print('')
         query = input(" % ")
         if query.lower() in ("exit", "quit"):
             break
