@@ -14,8 +14,8 @@ from config import (
     PROFILE_FILE,
     PROFILE_INFO,
     CHESSCOM_USERNAME,
-    PROFILE_ANALYSE_MAX_GAMES,
-    ANALYSED_GAMES_FILE,
+    GAMES_ANALYSE_MAX,
+    GAMES_ANALYSED_FILE,
 )
 
 from analyse import (
@@ -193,13 +193,13 @@ def build_player_profile_from_file():
     
     pgns = load_pgns_from_file(GAMES_ARCHIVE_FILE)
 
-    if str(PROFILE_ANALYSE_MAX_GAMES).lower() != 'all':
+    if str(GAMES_ANALYSE_MAX).lower() != 'all':
         try:
-            max_games = int(PROFILE_ANALYSE_MAX_GAMES)
+            max_games = int(GAMES_ANALYSE_MAX)
             pgns = pgns[:max_games]
             logging.warning(f"[DEBUG] Limiting analysis to {max_games} games.")
         except ValueError:
-            logging.error(f"[ERROR] PROFILE_ANALYSE_MAX_GAMES is not a valid number: {PROFILE_ANALYSE_MAX_GAMES}")
+            logging.error(f"[ERROR] GAMES_ANALYSE_MAX is not a valid number: {GAMES_ANALYSE_MAX}")
             raise
     my_stockfish = init_stockfish()
 
@@ -219,7 +219,7 @@ def build_player_profile_from_file():
         except Exception as e:
             logging.error(f"Error analyzing profile game {i + 1}: {e}")
 
-    save_analysis(analyzed, ANALYSED_GAMES_FILE)
+    save_analysis(analyzed, GAMES_ANALYSED_FILE)
     build_player_profile(analyzed)
 
 

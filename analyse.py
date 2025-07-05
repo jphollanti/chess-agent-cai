@@ -8,7 +8,7 @@ from stockfish import Stockfish
 from config import (
     STOCKFISH_PATH,
     EVAL_DROP_THRESHOLD,
-    ANALYSED_GAMES_FILE,
+    GAMES_ANALYSED_FILE,
     GAMES_ARCHIVE_FILE,
     ECO_OPENINGS_PATH,
 )
@@ -158,7 +158,7 @@ def main():
         except Exception as e:
             logging.error(f"Error analyzing game {i + 1}: {e}")
 
-    save_analysis(output, ANALYSED_GAMES_FILE)
+    save_analysis(output, GAMES_ANALYSED_FILE)
 
 
 if __name__ == "__main__":

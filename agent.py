@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import logging
 import warnings
 from langchain_core._api import LangChainDeprecationWarning
+import re
 
 # Suppress LangChainDeprecationWarnings
 warnings.filterwarnings("ignore", category=LangChainDeprecationWarning)
@@ -22,7 +23,7 @@ from config import (
     OPENAI_MODEL,
     OPENAI_API_KEY,
     PROFILE_FILE,
-    ANALYSED_GAMES_FILE,
+    GAMES_ANALYSED_FILE,
     GAMES_ARCHIVE_FILE,
 )
 from get_from_chesscom import fetch_recent_games
@@ -33,6 +34,91 @@ logging.basicConfig(level=logging.INFO)
 
 class DummyInput(BaseModel):
     input: str
+
+def extract_pgn_moves(pgn: str) -> str:
+    """Strip metadata from PGN and keep only the move list."""
+    # Remove tags like [Event "..."]
+    no_metadata = re.sub(r"\[.*?\]\s*", "", pgn)
+
+    # Remove result markers like "1-0", "0-1", "1/2-1/2" at the end
+    clean = re.sub(r"\s*1-0|\s*0-1|\s*1/2-1/2\s*", "", no_metadata).strip()
+
+    return clean
+
+def get_llm():
+    if LLM_PROVIDER == "openai":
+        logging.info(f"Loading llm from: Open AI")
+        return ChatOpenAI(
+            openai_api_key = OPENAI_API_KEY,
+            model = OPENAI_MODEL,
+            temperature = LLM_TEMPERATURE,
+        )
+    else:  # Local LLM via LM Studio
+        logging.info(f"Loading llm from: {LOCAL_API_BASE}")
+        return ChatOpenAI(
+            openai_api_key = "lm-studio",  # Dummy key
+            openai_api_base = LOCAL_API_BASE,
+            model = LOCAL_MODEL_NAME,
+            temperature = LLM_TEMPERATURE,
+        )
+
+@tool(args_schema=DummyInput)
+def analyze_recently_lost_games(input: str) -> str:
+    """Analyze the last n lost games and provide coaching feedback."""
+
+    ## Todo, add profile to prompt
+    try:
+        with open(GAMES_ANALYSED_FILE, "r") as f:
+            all_games = json.load(f)
+        
+        lean_games = [
+            {
+                "pgn": extract_pgn_moves(g["pgn"]),
+                "eval_dips": g.get("eval_dips", {}),
+                "termination": g.get("termination", ""),
+            }
+            for g in all_games
+        ]
+
+        lost_games = [
+            g for g in lean_games
+            if not (f"{CHESSCOM_USERNAME} won" in g.get("termination"))
+        ]
+        # prompt length becomes an issue with local llm
+        recent_losses = lost_games[:5]
+
+        if not recent_losses:
+            return "No lost games found to analyze."
+
+        prompt = f"""
+You're a chess coach AI helping me improve my play.
+
+Below is a JSON array. Each element represents a game I lost recently. Each contains:
+- "pgn": the full PGN of the game
+- "eval_dips": significant drops in evaluation during the game. These dips are separated into "white" and "black" depending on which color made the mistake.
+
+My username is {CHESSCOM_USERNAME}
+
+Please analyze the set of games as a whole and identify:
+1. **Recurring mistakes** or themes across multiple games (e.g., hanging pieces, poor openings, tactical oversights).
+2. **Phases of the game** where mistakes tend to occur (opening, middlegame, endgame).
+3. **Suggestions for improvement** based on these patterns — not game-by-game advice, but overall priorities (e.g., study king safety, improve calculation in sharp positions).
+4. If possible, categorize the dips (e.g., strategic, tactical, time-pressure blunders).
+
+Here is the JSON data:
+{json.dumps(recent_losses, indent=2)}
+"""
+        print('---')
+        print('---')
+        print(prompt)
+        print('---')
+        print('---')
+        
+        llm = get_llm()
+        response = llm.predict(prompt)
+        return "Here's your coaching report:\n\n" + response
+    except Exception as e:
+        return f"Failed to analyze lost games: {str(e)}"
 
 def ensure_profile_data():
     if not os.path.exists(GAMES_ARCHIVE_FILE):
@@ -46,7 +132,6 @@ def ensure_profile_data():
         build_player_profile_from_file()
     else:
         print("Profile already analyzed.")
-
 
 @tool
 def query_chess_profile(query: str) -> str:
@@ -66,8 +151,6 @@ def query_chess_profile(query: str) -> str:
 
     context = json.dumps(profile_data, indent=2)
 
-    llm = ChatOpenAI(temperature=0, model=OPENAI_MODEL)
-
     prompt = f"""
 You are a helpful chess coach assistant for a human player. 
 
@@ -80,6 +163,7 @@ QUESTION:
 {query}
 """
 
+    llm = get_llm()
     return llm.predict(prompt)
 
 @tool(args_schema=DummyInput)
@@ -119,9 +203,10 @@ def main():
     print("   • Recommend openings based on my profile")
     print("   • Update my player profile")
     print("   • Show some games where I played well")
+    print("   • Analyze my recent losses")
     print("-" * 60)
-    print("If you update your games or want a fresh analysis, say:")
-    print("   → 'update my player profile'")
+    print("If you play more games or want a fresh analysis, say:")
+    print("   • 'rebuild player profile'")
     print("=" * 60)
     print()
 
@@ -129,24 +214,10 @@ def main():
         update_player_profile,
         query_chess_profile,
         rebuild_player_profile,
+        analyze_recently_lost_games,
     ]
     
-    if LLM_PROVIDER == "openai":
-        logging.info(f"Loading llm from: Open AI")
-        llm = ChatOpenAI(
-            openai_api_key = OPENAI_API_KEY,
-            model = OPENAI_MODEL,
-            temperature = LLM_TEMPERATURE,
-        )
-    else:  # Local LLM via LM Studio
-        logging.info(f"Loading llm from: {LOCAL_API_BASE}")
-        llm = ChatOpenAI(
-            openai_api_key = "lm-studio",  # Dummy key
-            openai_api_base = LOCAL_API_BASE,
-            model = LOCAL_MODEL_NAME,
-            temperature = LLM_TEMPERATURE,
-        )
-
+    llm = get_llm()
     agent = initialize_agent(
         tools,
         llm,

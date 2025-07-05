@@ -19,11 +19,11 @@ GAMES_TO_ANALYSE = 10
 
 GAMES_ARCHIVE_FILE = DATA_DIR / "games_archive.json"
 GAMES_ARCHIVE_GET_MONTHS = 3
-ANALYSED_GAMES_FILE = DATA_DIR / "games_analyzed.json"
+GAMES_ANALYSED_FILE = DATA_DIR / "games_analyzed.json"
+GAMES_ANALYSE_MAX = 30
 COACH_REPORT_FILE = DATA_DIR / "coach_report.txt"
 
 # Profile
-PROFILE_ANALYSE_MAX_GAMES = 7
 PROFILE_FILE = DATA_DIR / "profile.json"
 
 LLM_PROVIDER = "local"
