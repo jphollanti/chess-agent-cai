@@ -15,10 +15,14 @@ warnings.filterwarnings("ignore", category=LangChainDeprecationWarning)
 
 from config import (
     CHESSCOM_USERNAME,
+    LLM_PROVIDER,
+    LLM_TEMPERATURE,
+    LOCAL_API_BASE,
+    LOCAL_MODEL_NAME,
+    OPENAI_MODEL,
     OPENAI_API_KEY,
     PROFILE_FILE,
     PROFILE_ANALYSED_GAMES_FILE,
-    OPENAI_MODEL,
     PROFILE_RAW_GAMES_FILE,
 )
 from get_games import get_games_for_profile_analysis
@@ -126,7 +130,22 @@ def main():
         query_chess_profile,
         rebuild_player_profile,
     ]
-    llm = ChatOpenAI(temperature=0, model=OPENAI_MODEL)
+    
+    if LLM_PROVIDER == "openai":
+        logging.info(f"Loading llm from: Open AI")
+        llm = ChatOpenAI(
+            openai_api_key = OPENAI_API_KEY,
+            model = OPENAI_MODEL,
+            temperature = LLM_TEMPERATURE,
+        )
+    else:  # Local LLM via LM Studio
+        logging.info(f"Loading llm from: {LOCAL_API_BASE}")
+        llm = ChatOpenAI(
+            openai_api_key = "lm-studio",  # Dummy key
+            openai_api_base = LOCAL_API_BASE,
+            model = LOCAL_MODEL_NAME,
+            temperature = LLM_TEMPERATURE,
+        )
 
     agent = initialize_agent(
         tools,

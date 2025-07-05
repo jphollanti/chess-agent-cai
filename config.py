@@ -28,7 +28,13 @@ PROFILE_AMOUNT_OF_MONTHS = 3
 PROFILE_ANALYSE_MAX_GAMES = 7
 PROFILE_FILE = DATA_DIR / "player_profile.json"
 
+LLM_PROVIDER = "local"
+LLM_TEMPERATURE = 0.2
+
 OPENAI_MODEL = "gpt-4o-2024-05-13"  # gpt-4o-2024-05-13 = o3. Or use "gpt-4o" or another like "gpt-4-turbo"
+
+LOCAL_MODEL_NAME = "nous-hermes-2-mistral-7b-dpo"
+LOCAL_API_BASE = "http://localhost:1234/v1"
 
 EVAL_DROP_THRESHOLD = 150  # in centipawns
 STOCKFISH_PARAMS = {
