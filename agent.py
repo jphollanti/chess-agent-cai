@@ -1,4 +1,6 @@
 import os
+import shutil
+from pathlib import Path
 import json
 from langchain_openai import ChatOpenAI
 from langchain_community.tools import Tool
@@ -10,6 +12,8 @@ import logging
 import warnings
 from langchain_core._api import LangChainDeprecationWarning
 import re
+import markdown
+
 
 # Suppress LangChainDeprecationWarnings
 warnings.filterwarnings("ignore", category=LangChainDeprecationWarning)
@@ -25,6 +29,8 @@ from config import (
     PROFILE_FILE,
     GAMES_ANALYSED_FILE,
     GAMES_ARCHIVE_FILE,
+    REVIEW_TEMPLATE_PATH,
+    REVIEW_GAMES_OUTPUT_PATH,
 )
 from get_from_chesscom import fetch_recent_games
 from build_profile import build_player_profile_from_file
@@ -77,6 +83,45 @@ def slim_down_profile(profile):
     del profile["chess_com_stats"]["chess960_daily"]
     return profile
 
+def create_review_page(pgns: [], players: [], instructions: str, output_dir_name: str):
+    template_dir = Path(REVIEW_TEMPLATE_PATH)
+    output_dir = Path(REVIEW_GAMES_OUTPUT_PATH) / output_dir_name
+
+    if os.path.exists(output_dir) and os.path.isdir(output_dir):
+        shutil.rmtree(output_dir)
+
+    # Create output dir if needed
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Copy template files
+    for filename in ["index.html", "dist.js"]:
+        shutil.copy(template_dir / filename, output_dir / filename)
+
+    # Load index.html and inject PGN + instructions
+    index_path = output_dir / "index.html"
+    with open(index_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    pgn_array_str = json.dumps(pgns, indent=2)
+    players_array_str = json.dumps(players, indent=2)
+    # Replace placeholders
+    html = html.replace(
+        'LLM Instructions go here',
+        markdown.markdown(instructions)
+    ).replace(
+        "{PGN_ARRAY}",
+        pgn_array_str
+    ).replace(
+        "{PLAYERS_ARRAY}",
+        players_array_str
+    )
+
+    # Save updated HTML
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    return f"Review page created: {output_dir.resolve()}"
+
 @tool(args_schema=DummyInput)
 def analyze_recently_lost_games(input: str) -> str:
     """Analyze the last n lost games and provide coaching feedback."""
@@ -95,6 +140,8 @@ def analyze_recently_lost_games(input: str) -> str:
         lean_games = [
             {
                 "pgn": extract_pgn_moves(g["pgn"]),
+                "white": g.get("white"),
+                "black": g.get("black"),
                 "white_dips": g.get("white_dips"),
                 "black_dips": g.get("black_dips"),
                 "termination": g.get("termination"),
@@ -138,6 +185,20 @@ Here is the JSON data:
         
         llm = get_llm()
         response = llm.predict(prompt)
+
+        # create review html
+        pgns = []
+        players = []
+        for loss in recent_losses:
+            pgns.append(loss["pgn"])
+            players.append({
+                'white': loss["white"],
+                'black': loss["black"],
+            })
+        rp = create_review_page(pgns, players, response, "recent_losses")
+
+        response += "\n\n" + rp
+
         return "Here's your coaching report:\n\n" + response
     except Exception as e:
         return f"Failed to analyze lost games: {str(e)}"

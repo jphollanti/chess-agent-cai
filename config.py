@@ -23,6 +23,10 @@ GAMES_ANALYSED_FILE = DATA_DIR / "games_analyzed.json"
 GAMES_ANALYSE_MAX = 30
 COACH_REPORT_FILE = DATA_DIR / "coach_report.txt"
 
+# Review
+REVIEW_TEMPLATE_PATH = ROOT_DIR / "review_template"
+REVIEW_GAMES_OUTPUT_PATH = ROOT_DIR / "data" / "game_review"
+
 # Profile
 PROFILE_FILE = DATA_DIR / "profile.json"
 
